@@ -1,0 +1,5 @@
+langgraph==0.2.53
+streamlit
+pdfplumber
+langchain
+python-dotenv
