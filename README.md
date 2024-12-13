@@ -1,44 +1,43 @@
-# PDF-based RAG Agent
+# LangGraph Code Generation Assistant
 
 ## Project Description
-The PDF-based RAG (Retrieval-Augmented Generation) Agent is a web application designed to process PDF documents, extract relevant information, and provide contextual responses to user queries. By leveraging OpenAI\'s language models and advanced embedding techniques, this application enables users to interact with the content of PDF files in a meaningful way, making it easier to retrieve specific information and citations.
+The LangGraph Code Generation Assistant is a powerful tool designed to assist developers in generating code based on user-defined programming requirements. It leverages advanced language models to interpret specifications, produce well-documented code, identify edge cases, and provide detailed implementation explanations. This project addresses the common challenge of translating vague programming requirements into functional code, enhancing productivity and code quality.
 
-### Key Features
-- Upload and process PDF documents.
-- Extract text and relevant information from PDFs.
-- Ask questions about the document and receive contextual responses.
-- Provide citations for the information retrieved.
+## Key Features
+- **Understanding Programming Requirements**: Interprets user-provided specifications to comprehend desired functionality.
+- **Code Generation with Documentation**: Produces code that includes comprehensive documentation for clarity and maintainability.
+- **Edge Case Handling**: Identifies and addresses potential edge cases to enhance code robustness and reliability.
+- **Implementation Explanation**: Provides detailed explanations of the code implementation to facilitate user understanding.
 
 ## Code Structure
 
 ```
-project-root/
+/langgraph_code_generation_assistant
 │
 ├── frontend.py          # Streamlit frontend for user interaction
-├── backend.py           # Backend logic for processing PDFs and generating responses
-└── requirements.txt     # List of dependencies required for the project
+└── backend.py           # Backend logic for code generation and processing
 
 ```
 
-### Key Files and Modules
-- **frontend.py**: Contains the Streamlit application code that handles user input, file uploads, and displays responses.
-- **backend.py**: Implements the logic for processing PDF files, generating embeddings, and retrieving answers based on user queries.
-- **requirements.txt**: Lists the necessary Python packages to run the application.
+### Key Files
+- **frontend.py**: This file contains the Streamlit application that serves as the user interface. It allows users to input their programming requirements and displays the generated code, documentation, and implementation details.
+- **backend.py**: This file implements the core logic for code generation using the LangGraph framework. It processes user requirements and interacts with the OpenAI API to generate code and documentation.
 
 ## Setup and Installation
 
 ### Prerequisites
 - Python 3.7 or higher
-- An OpenAI API key (for accessing OpenAI\'s language models)
+- An OpenAI API key
 
 ### Installation Steps
 1. **Clone the repository**:
    <bash>
-   git clone <repository-url>
-   cd <repository-directory>
+   git clone https://github.com/yourusername/langgraph_code_generation_assistant.git
+   cd langgraph_code_generation_assistant
    </bash>
 
-2. **Set up the development environment** (optional but recommended):
+2. **Set up the development environment**:
+   It is recommended to use a virtual environment. You can create one using:
    <bash>
    python -m venv venv
    source venv/bin/activate  # On Windows use `venv\\Scripts\\activate`
@@ -55,22 +54,26 @@ project-root/
    </bash>
 
 ## Dependencies
-- `langgraph==0.2.53`
+- `langgraph`
 - `streamlit`
-- `os`
-- `pdfplumber`
-- `langchain`
+- `pydantic`
+- `langchain_openai`
+- `langchain_core`
 
 ## Configuration Instructions
-- Open the application in your web browser after running the Streamlit command.
-- Enter your OpenAI API key in the sidebar to enable the application to access OpenAI\'s models.
+- Enter your OpenAI API key in the sidebar of the Streamlit application to enable code generation functionality.
 
 ## Usage Examples
-1. Upload a PDF document using the file uploader.
-2. After the PDF is processed, enter a question related to the content of the document.
-3. Click the "Get Response" button to receive an answer along with citations.
+1. Open the application in your web browser.
+2. Enter your OpenAI API key in the sidebar.
+3. Describe your programming requirements in the text area.
+4. Click the "Generate Code" button to receive:
+   - Fully documented code
+   - Implementation explanation
+   - Edge case considerations
 
 ## Troubleshooting Tips
-- If you encounter issues with file uploads, ensure that the PDF file is not corrupted and is in the correct format.
-- Make sure your OpenAI API key is valid and has the necessary permissions.
-- If the application does not start, check for any error messages in the terminal and ensure all dependencies are installed correctly.
+- If you encounter an error related to the OpenAI API, ensure that your API key is valid and has the necessary permissions.
+- For issues with package installations, verify that you are using the correct Python version and that your virtual environment is activated.
+
+Feel free to contribute to the project by submitting issues or pull requests!

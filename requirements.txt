@@ -1,5 +1,6 @@
-langgraph==0.2.53
-streamlit
-pdfplumber
-langchain
+langchain_core
+langchain_openai
+langgraph
+pydantic
 python-dotenv
+streamlit
