@@ -1,127 +1,122 @@
 import os
+from typing import Dict, List, Optional
+from pathlib import Path
 import tempfile
-from typing import List, Tuple, Dict, Any
-from dataclasses import dataclass
-from typing_extensions import TypedDict
 
-import chromadb
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import Chroma
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from langgraph.graph import StateGraph, END
 
-@dataclass
-class Document:
-    """Represents a processed document with its content and metadata."""
-    content: str
-    metadata: Dict[str, Any]
-
-class GraphState(TypedDict):
-    """State maintained between nodes in the graph."""
-    query: str
-    documents: List[Document]
-    response: str
-    sources: List[str]
-
 class PDFRagAgent:
-    def __init__(self):
-        """Initialize the PDF RAG Agent with necessary components."""
+    def __init__(self, api_key: str):
+        """Initialize the PDF RAG Agent with OpenAI API key."""
+        os.environ["OPENAI_API_KEY"] = api_key
+        
+        # Initialize components
         self.embeddings = OpenAIEmbeddings()
-        self.llm = ChatOpenAI(temperature=0)
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
-        
-        # Initialize ChromaDB
-        self.vector_store = Chroma(
+        self.vectorstore = Chroma(
             collection_name="pdf_rag",
             embedding_function=self.embeddings
         )
+        self.llm = ChatOpenAI(temperature=0)
         
-        # Initialize LangGraph
-        self.graph = self._build_graph()
-        self.app = self.graph.compile()
-
-    def _build_graph(self) -> StateGraph:
-        """Build the LangGraph workflow for RAG."""
-        workflow = StateGraph(GraphState)
+        # Initialize the graph
+        self.graph = self._create_graph()
         
-        # Add nodes
+    def _create_graph(self) -> StateGraph:
+        """Create the LangGraph workflow for RAG."""
+        # Define the graph state
+        workflow = StateGraph(Dict)
+        
+        # Define nodes
         workflow.add_node("retrieve", self._retrieve_documents)
         workflow.add_node("generate", self._generate_response)
         
-        # Build graph
-        workflow.set_entry_point("retrieve")
+        # Define edges
         workflow.add_edge("retrieve", "generate")
         workflow.add_edge("generate", END)
         
-        return workflow
-
-    def _retrieve_documents(self, state: GraphState) -> GraphState:
-        """Retrieve relevant documents based on the query."""
-        docs = self.vector_store.similarity_search(
-            state["query"],
-            k=3
-        )
-        
-        documents = [
-            Document(
-                content=doc.page_content,
-                metadata=doc.metadata
-            ) for doc in docs
-        ]
-        
-        return {"query": state["query"], "documents": documents}
-
-    def _generate_response(self, state: GraphState) -> GraphState:
-        """Generate a response using retrieved documents."""
-        context = "\n\n".join([doc.content for doc in state["documents"]])
-        
-        messages = [
-            SystemMessage(content="You are a helpful assistant that answers questions based on the provided context. Always be factual and cite your sources."),
-            HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['query']}")
-        ]
-        
-        response = self.llm.invoke(messages)
-        
-        sources = [
-            f"File: {doc.metadata['source']}, Page: {doc.metadata['page']}"
-            for doc in state["documents"]
-        ]
-        
-        return {
-            "query": state["query"],
-            "documents": state["documents"],
-            "response": response.content,
-            "sources": sources
-        }
-
-    def process_pdf(self, file) -> None:
-        """Process a PDF file and store its embeddings."""
+        return workflow.compile()
+    
+    def process_pdf(self, pdf_file) -> None:
+        """Process a PDF file and add it to the vector store."""
         # Save uploaded file temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-            tmp_file.write(file.getvalue())
-            file_path = tmp_file.name
+            tmp_file.write(pdf_file.getvalue())
+            tmp_path = tmp_file.name
         
         try:
-            # Load and process PDF
-            loader = PyPDFLoader(file_path)
+            # Load and split the PDF
+            loader = PyPDFLoader(tmp_path)
             pages = loader.load()
+            
+            # Add source information
+            for page in pages:
+                page.metadata["source"] = f"{pdf_file.name}, Page {page.metadata['page'] + 1}"
             
             # Split into chunks
             chunks = self.text_splitter.split_documents(pages)
             
             # Add to vector store
-            self.vector_store.add_documents(chunks)
+            self.vectorstore.add_documents(chunks)
             
+        except Exception as e:
+            print(f"Error processing PDF: {e}")
         finally:
-            # Cleanup temporary file
-            os.unlink(file_path)
-
-    def query(self, question: str) -> Tuple[str, List[str]]:
-        """Query the RAG system with a question."""
-        result = self.app.invoke({"query": question})
-        return result["response"], result["sources"]
+            # Clean up temporary file
+            os.unlink(tmp_path)
+    
+    def _retrieve_documents(self, state: Dict) -> Dict:
+        """Retrieve relevant documents based on the query."""
+        try:
+            docs = self.vectorstore.similarity_search(
+                state["query"],
+                k=3
+            )
+            return {"documents": docs, "query": state["query"]}
+        except Exception as e:
+            print(f"Error retrieving documents: {e}")
+            return {"documents": [], "query": state["query"]}
+    
+    def _generate_response(self, state: Dict) -> Dict:
+        """Generate a response using retrieved documents."""
+        # Create context from documents
+        context = "\n\n".join(
+            f"[{doc.metadata['source']}]
+{doc.page_content}"
+            for doc in state["documents"]
+        )
+        
+        # Create prompt
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a helpful assistant that answers questions based on the provided documents. "
+                      "Include relevant source citations in your response."),
+            ("human", "Context:\n\n{context}\n\nQuestion: {query}")
+        ])
+        
+        # Generate response
+        chain = prompt | self.llm | StrOutputParser()
+        response = chain.invoke({
+            "context": context,
+            "query": state["query"]
+        })
+        
+        # Extract sources
+        sources = [doc.metadata["source"] for doc in state["documents"]]
+        
+        return {
+            "answer": response,
+            "sources": sources
+        }
+    
+    def query(self, query: str) -> Dict:
+        """Process a query through the RAG workflow."""
+        return self.graph.invoke({"query": query})
