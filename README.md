@@ -1,41 +1,38 @@
-# LangGraph Python Code Generation Assistant
+# LangGraph PDF-Based RAG Agent
 
 ## Project Description
-The LangGraph Python Code Generation Assistant is a web application designed to help users generate well-documented Python code based on their programming requirements. By leveraging the capabilities of OpenAI\'s language models, this assistant interprets user specifications, generates code with comprehensive documentation, and provides detailed explanations of the implementation. This tool aims to simplify the coding process, making it accessible for both novice and experienced programmers.
+The **LangGraph PDF-Based RAG Agent** is a local application designed to assist users in retrieving information from PDF documents. By leveraging semantic embedding generation and contextual response generation, this agent allows users to upload PDF files, query them using natural language, and receive informative responses that cite the sources of the information.
 
-## Key Features
-- **Understanding Programming Requirements**: The assistant interprets user-provided specifications to comprehend the desired functionality.
-- **Code Generation with Documentation**: It produces code that includes comprehensive documentation, ensuring clarity and maintainability.
-- **Implementation Explanation**: The assistant provides detailed explanations of the code implementation to facilitate user understanding.
+### Key Features
+- **PDF Loading and Processing**: Users can upload and process PDF documents from their local storage.
+- **Semantic Embedding Generation**: The agent generates and stores embeddings locally for efficient reuse, avoiding the need for reprocessing.
+- **Semantic Search**: A semantic search index is built using the embeddings, enabling natural language queries to retrieve relevant passages from the PDFs.
+- **Contextual Response Generation**: The agent combines retrieved passages with language model capabilities to generate clear and informative responses, citing sources including the PDF file name and page number.
 
 ## Code Structure
 
 ```
-project-root/
-│
-├── frontend.py          # Streamlit frontend for user interaction
-├── backend.py           # Backend logic for code generation and processing
-├── requirements.txt     # List of dependencies required for the project
-└── README.md            # Project documentation
+.
+├── frontend.py         # Streamlit frontend for user interaction
+└── backend.py          # Backend logic for processing PDFs and generating responses
 
 ```
 
-### Key Files and Modules
-- **frontend.py**: This file contains the Streamlit application that serves as the user interface. It allows users to input their programming requirements and API key, and displays the generated code and explanations.
-- **backend.py**: This file implements the core logic for processing user requirements and generating code using LangGraph and OpenAI\'s models.
-- **requirements.txt**: This file lists all the necessary Python packages required to run the application.
+### Key Files
+- **frontend.py**: This file contains the Streamlit application that allows users to upload PDF documents, enter queries, and view responses.
+- **backend.py**: This file implements the core logic of the PDF RAG agent, including PDF processing, embedding generation, semantic search, and response generation.
 
 ## Setup and Installation
 
 ### Prerequisites
 - Python 3.7 or higher
-- An OpenAI API key
+- An OpenAI API key (for using OpenAI models)
 
 ### Installation Steps
 1. **Clone the repository**:
    <bash>
-   git clone https://github.com/yourusername/langgraph-code-assistant.git
-   cd langgraph-code-assistant
+   git clone https://github.com/yourusername/langgraph-pdf-rag-agent.git
+   cd langgraph-pdf-rag-agent
    </bash>
 
 2. **Set up the development environment**:
@@ -46,35 +43,38 @@ project-root/
    </bash>
 
 3. **Install dependencies**:
+   Install the required packages using pip:
    <bash>
    pip install -r requirements.txt
    </bash>
 
 4. **Run the application**:
+   Start the Streamlit application:
    <bash>
    streamlit run frontend.py
    </bash>
 
 ## Dependencies
-- `langgraph`: For managing the code generation workflow.
-- `streamlit`: For creating the web application interface.
-- `pydantic`: For data validation and settings management.
-- `langchain_openai`: For integrating OpenAI\'s language models.
-- `langchain_core`: For core functionalities of LangChain.
-- `logging`: For logging application events and errors.
+- `langgraph==0.2.53`
+- `streamlit`
+- `chromadb`
+- `langchain_community`
+- `langchain_openai`
+- `langchain_core`
+- `typing_extensions`
 
 ## Configuration Instructions
-To use the application, you need to provide your OpenAI API key. Enter the key in the sidebar of the Streamlit application to enable code generation.
+1. Open the Streamlit application in your web browser.
+2. In the sidebar, enter your OpenAI API key to enable the agent's functionality.
 
 ## Usage Examples
-1. Open the application in your web browser.
-2. Enter your programming requirements in the text area.
-3. Provide your OpenAI API key in the sidebar.
-4. Click the "Generate Code" button to see the generated code and its explanation.
+1. **Upload PDF Documents**: Use the file uploader to select and upload one or more PDF files.
+2. **Ask Questions**: Enter a question related to the content of the uploaded PDFs in the provided text input field.
+3. **View Responses**: After processing, the agent will display the generated response along with the sources cited.
 
 ## Troubleshooting Tips
-- Ensure that your OpenAI API key is valid and has the necessary permissions.
-- If you encounter any errors during code generation, check the logs for detailed error messages.
-- Make sure all dependencies are installed correctly by running `pip install -r requirements.txt`.
+- If you encounter issues with PDF processing, ensure that the files are in a valid PDF format.
+- Make sure your OpenAI API key is correctly entered in the sidebar.
+- If the application fails to start, check for any missing dependencies or errors in the console output.
 
-This README provides a comprehensive overview of the LangGraph Python Code Generation Assistant, guiding users through setup, usage, and troubleshooting.
+This README provides a comprehensive overview of the LangGraph PDF-Based RAG Agent, guiding users through setup, usage, and troubleshooting.

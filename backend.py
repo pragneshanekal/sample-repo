@@ -1,116 +1,127 @@
 import os
-from typing import Dict, List, TypedDict
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.output_parsers import PydanticOutputParser
-from pydantic import BaseModel, Field
+import tempfile
+from typing import List, Tuple, Dict, Any
+from dataclasses import dataclass
+from typing_extensions import TypedDict
+
+import chromadb
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_community.vectorstores import Chroma
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import StateGraph, END
-import logging
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+@dataclass
+class Document:
+    """Represents a processed document with its content and metadata."""
+    content: str
+    metadata: Dict[str, Any]
 
-# Define state schema
 class GraphState(TypedDict):
-    """State schema for code generation graph."""
-    requirements: str
-    code_solution: str
-    explanation: str
-    messages: List[str]
-    error: str
+    """State maintained between nodes in the graph."""
+    query: str
+    documents: List[Document]
+    response: str
+    sources: List[str]
 
-# Define output schema
-class CodeSolution(BaseModel):
-    """Schema for code generation output."""
-    code: str = Field(description="Generated code with documentation")
-    explanation: str = Field(description="Detailed explanation of implementation")
-    imports: str = Field(description="Required import statements")
-
-def get_llm(api_key: str) -> ChatOpenAI:
-    """Initialize ChatOpenAI with provided API key."""
-    return ChatOpenAI(
-        temperature=0.1,
-        model="gpt-4",
-        api_key=api_key
-    )
-
-def create_code_generation_chain(llm: ChatOpenAI):
-    """Create the code generation chain with proper prompting."""
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are an expert Python programmer. Generate well-documented code based on the requirements.
-        Include comprehensive docstrings and inline comments. Structure your response with:
-        1. Import statements
-        2. Documented code implementation
-        3. Detailed explanation of the approach"""),
-        ("user", "{requirements}")
-    ])
-    return prompt | llm.with_structured_output(CodeSolution)
-
-def generate_code(state: GraphState) -> Dict:
-    """Node for generating code based on requirements."""
-    try:
-        logger.info("Generating code from requirements")
-        llm = get_llm(state.get("api_key", ""))
-        chain = create_code_generation_chain(llm)
-        solution = chain.invoke({"requirements": state["requirements"]})
-        return {
-            "code_solution": solution.code,
-            "explanation": solution.explanation,
-            "error": ""
-        }
-    except Exception as e:
-        logger.error(f"Error in code generation: {str(e)}")
-        return {"error": str(e)}
-
-def validate_code(state: GraphState) -> str:
-    """Node for validating generated code."""
-    if state["error"]:
-        return "error"
-    return "end"
-
-def create_graph(api_key: str):
-    """Create and configure the LangGraph workflow."""
-    # Initialize graph
-    workflow = StateGraph(GraphState)
-    
-    # Add nodes
-    workflow.add_node("generate", generate_code)
-    
-    # Add edges
-    workflow.set_entry_point("generate")
-    workflow.add_conditional_edges(
-        "generate",
-        validate_code,
-        {
-            "end": END,
-            "error": "generate"
-        }
-    )
-    
-    return workflow.compile()
-
-def process_requirements(requirements: str, api_key: str) -> Dict:
-    """Process programming requirements and generate code solution."""
-    try:
-        # Initialize graph with state
-        graph = create_graph(api_key)
+class PDFRagAgent:
+    def __init__(self):
+        """Initialize the PDF RAG Agent with necessary components."""
+        self.embeddings = OpenAIEmbeddings()
+        self.llm = ChatOpenAI(temperature=0)
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200
+        )
         
-        # Execute graph
-        result = graph.invoke({
-            "requirements": requirements,
-            "code_solution": "",
-            "explanation": "",
-            "messages": [],
-            "error": "",
-            "api_key": api_key
-        })
+        # Initialize ChromaDB
+        self.vector_store = Chroma(
+            collection_name="pdf_rag",
+            embedding_function=self.embeddings
+        )
+        
+        # Initialize LangGraph
+        self.graph = self._build_graph()
+        self.app = self.graph.compile()
+
+    def _build_graph(self) -> StateGraph:
+        """Build the LangGraph workflow for RAG."""
+        workflow = StateGraph(GraphState)
+        
+        # Add nodes
+        workflow.add_node("retrieve", self._retrieve_documents)
+        workflow.add_node("generate", self._generate_response)
+        
+        # Build graph
+        workflow.set_entry_point("retrieve")
+        workflow.add_edge("retrieve", "generate")
+        workflow.add_edge("generate", END)
+        
+        return workflow
+
+    def _retrieve_documents(self, state: GraphState) -> GraphState:
+        """Retrieve relevant documents based on the query."""
+        docs = self.vector_store.similarity_search(
+            state["query"],
+            k=3
+        )
+        
+        documents = [
+            Document(
+                content=doc.page_content,
+                metadata=doc.metadata
+            ) for doc in docs
+        ]
+        
+        return {"query": state["query"], "documents": documents}
+
+    def _generate_response(self, state: GraphState) -> GraphState:
+        """Generate a response using retrieved documents."""
+        context = "\n\n".join([doc.content for doc in state["documents"]])
+        
+        messages = [
+            SystemMessage(content="You are a helpful assistant that answers questions based on the provided context. Always be factual and cite your sources."),
+            HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['query']}")
+        ]
+        
+        response = self.llm.invoke(messages)
+        
+        sources = [
+            f"File: {doc.metadata['source']}, Page: {doc.metadata['page']}"
+            for doc in state["documents"]
+        ]
         
         return {
-            "code": result["code_solution"],
-            "explanation": result["explanation"],
-            "error": result["error"]
+            "query": state["query"],
+            "documents": state["documents"],
+            "response": response.content,
+            "sources": sources
         }
-    except Exception as e:
-        logger.error(f"Error processing requirements: {str(e)}")
-        return {"error": str(e)}
+
+    def process_pdf(self, file) -> None:
+        """Process a PDF file and store its embeddings."""
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+            tmp_file.write(file.getvalue())
+            file_path = tmp_file.name
+        
+        try:
+            # Load and process PDF
+            loader = PyPDFLoader(file_path)
+            pages = loader.load()
+            
+            # Split into chunks
+            chunks = self.text_splitter.split_documents(pages)
+            
+            # Add to vector store
+            self.vector_store.add_documents(chunks)
+            
+        finally:
+            # Cleanup temporary file
+            os.unlink(file_path)
+
+    def query(self, question: str) -> Tuple[str, List[str]]:
+        """Query the RAG system with a question."""
+        result = self.app.invoke({"query": question})
+        return result["response"], result["sources"]

@@ -1,6 +1,8 @@
+chromadb
+langchain_community
 langchain_core
 langchain_openai
 langgraph
-pydantic
 python-dotenv
 streamlit
+typing_extensions
