@@ -1,66 +1,50 @@
 import streamlit as st
-from backend import CodeGenerationGraph
+from backend import process_requirements
 
 def main():
-    st.set_page_config(page_title="LangGraph Code Generation Assistant", layout="wide")
+    st.set_page_config(page_title="Code Generation Assistant", layout="wide")
     
     # Sidebar for API key
     with st.sidebar:
         st.title("Configuration")
-        openai_api_key = st.text_input("OpenAI API Key", type="password")
-        if not openai_api_key:
-            st.warning("Please enter your OpenAI API key to continue.")
-            return
-
-    st.title("LangGraph Code Generation Assistant")
-    st.write("Get help with code generation, documentation, and implementation explanations.")
-
-    # User input section
-    user_requirement = st.text_area(
-        "Enter your programming requirements:",
-        height=150,
+        api_key = st.text_input("Enter OpenAI API Key", type="password")
+        st.markdown("---")
+    
+    # Main content
+    st.title("Code Generation Assistant")
+    st.markdown("""
+    This assistant helps you generate well-documented Python code based on your requirements.
+    Please provide detailed specifications for your programming needs.
+    """
+    )
+    
+    # Input section
+    requirements = st.text_area(
+        "Enter Programming Requirements",
+        height=200,
         placeholder="Describe the functionality you need..."
     )
-
-    if st.button("Generate Code") and user_requirement:
-        try:
-            with st.spinner("Generating code and documentation..."):
-                # Initialize the graph with the API key
-                code_graph = CodeGenerationGraph(openai_api_key)
-                
-                # Process the requirement through the graph
-                result = code_graph.process_requirement(user_requirement)
-                
-                # Display results in tabs
-                tab1, tab2, tab3 = st.tabs(["Generated Code", "Documentation", "Implementation Details"])
-                
-                with tab1:
-                    st.code(result["code"], language="python")
-                
-                with tab2:
-                    st.markdown(result["documentation"])
-                
-                with tab3:
-                    st.markdown(result["implementation_details"])
-                    
-                # Display edge cases
-                st.subheader("Edge Cases to Consider")
-                for idx, edge_case in enumerate(result["edge_cases"], 1):
-                    st.write(f"{idx}. {edge_case}")
-                    
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
     
-    # Add usage instructions
-    with st.expander("How to use"):
-        st.markdown("""
-        1. Enter your OpenAI API key in the sidebar
-        2. Describe your programming requirements in detail
-        3. Click 'Generate Code' to receive:
-           - Fully documented code
-           - Implementation explanation
-           - Edge case considerations
-        """)
+    if st.button("Generate Code") and requirements and api_key:
+        with st.spinner("Generating code..."):
+            result = process_requirements(requirements, api_key)
+            
+            if result.get("error"):
+                st.error(f"Error: {result['error']}")
+            else:
+                # Display generated code
+                st.subheader("Generated Code")
+                st.code(result["code"], language="python")
+                
+                # Display explanation
+                st.subheader("Implementation Explanation")
+                st.markdown(result["explanation"])
+    
+    elif st.button("Generate Code"):
+        if not api_key:
+            st.error("Please enter your OpenAI API key in the sidebar.")
+        if not requirements:
+            st.error("Please enter your programming requirements.")
 
 if __name__ == "__main__":
     main()
